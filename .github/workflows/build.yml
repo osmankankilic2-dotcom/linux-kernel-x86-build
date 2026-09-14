@@ -2,32 +2,18 @@ name: Build x86_64 Linux Kernel
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: [ main, master ]
   workflow_dispatch:
-    inputs:
-      kernel_version:
-        description: 'Linux Kernel Version (e.g. 6.12.1)'
-        required: true
-        default: '6.12.1'
 
 jobs:
-  build:
+  build-kernel:
     runs-on: ubuntu-latest
-
+    
     steps:
-    - name: Checkout repository
+    - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Set up environment variables
-      run: |
-        VERSION="${{ github.event.inputs.kernel_version || '6.12.1' }}"
-        MAJOR_VERSION=$(echo "$VERSION" | cut -d. -f1)
-        echo "KERNEL_VERSION=$VERSION" >> $GITHUB_ENV
-        echo "KERNEL_MAJOR=$MAJOR_VERSION" >> $GITHUB_ENV
-
-    - name: Install build dependencies
+    - name: Install Dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -39,52 +25,62 @@ jobs:
           libelf-dev \
           bc \
           rsync \
-          kmod \
-          cpio \
-          dwarves \
-          zstd \
-          tar \
           wget \
+          pahole \
           git
 
-    - name: Download Linux Kernel source
+    - name: Download Linux Kernel Source
       run: |
-        echo "Downloading Linux Kernel v${KERNEL_VERSION}..."
-        URL="https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_MAJOR}.x/linux-${KERNEL_VERSION}.tar.xz"
-        wget "$URL" -O linux.tar.xz || {
-          echo "Failed to download $URL, trying alternative..."
-          wget "https://www.kernel.org/pub/linux/kernel/v${KERNEL_MAJOR}.x/linux-${KERNEL_VERSION}.tar.xz" -O linux.tar.xz
-        }
-        tar -xf linux.tar.xz
-        mv linux-${KERNEL_VERSION} linux-source
+        # Latest stable or long-term kernel version (e.g., 6.6 or 6.12)
+        KERNEL_VERSION="6.12.9"
+        MAJOR_VERSION=$(echo $KERNEL_VERSION | cut -d. -f1)
+        
+        echo "Downloading kernel version v$KERNEL_VERSION..."
+        wget https://cdn.kernel.org/pub/linux/kernel/v$MAJOR_VERSION.x/linux-$KERNEL_VERSION.tar.xz
+        tar -xf linux-$KERNEL_VERSION.tar.xz
+        mv linux-$KERNEL_VERSION linux-kernel
+        ls -la linux-kernel
 
-    - name: Configure Linux Kernel
+    - name: Configure Kernel
       run: |
-        cd linux-source
+        cd linux-kernel
+        # Use default x86_64 configuration (defconfig)
         make defconfig
-        # Optimize build speed by disabling heavy debug info
-        scripts/config --disable CONFIG_DEBUG_INFO
-        scripts/config --disable CONFIG_DEBUG_INFO_BTF
-        scripts/config --enable CONFIG_BLK_DEV_INITRD
-        make olddefconfig
+        
+        # Optional: enable/disable options if needed, e.g. ensuring debugging symbols or specific features
+        # scripts/config --disable SYSTEM_TRUSTED_KEYS
+        # scripts/config --disable SYSTEM_REVOCATION_KEYS
 
-    - name: Compile Linux Kernel
+    - name: Build Kernel
       run: |
-        cd linux-source
-        echo "Starting build with $(nproc) cores..."
-        make -j$(nproc) bzImage
-        make -j$(nproc) modules
+        cd linux-kernel
+        # Get number of CPU cores for parallel compilation
+        CORES=$(nproc)
+        echo "Building kernel using $CORES cores..."
+        make -j$CORES bzImage
+        make -j$CORES modules
 
     - name: Prepare Artifacts
       run: |
-        mkdir -p output
-        cp linux-source/arch/x86/boot/bzImage output/bzImage
-        cp linux-source/.config output/kernel.config
-        echo "Kernel build completed successfully."
-        ls -lh output/
+        mkdir -p kernel-artifacts
+        cp linux-kernel/arch/x86/boot/bzImage kernel-artifacts/
+        cp linux-kernel/.config kernel-artifacts/config
+        
+        # Optionally pack modules if built
+        cd linux-kernel
+        make INSTALL_MOD_PATH=../modroot modules_install
+        cd ../modroot
+        tar -czf ../kernel-artifacts/modules.tar.gz .
+        cd ..
+        
+        ls -lh kernel-artifacts
 
     - name: Upload Kernel Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: linux-kernel-x86_64-${{ env.KERNEL_VERSION }}
-        path: output/
+        name: x86-linux-kernel-${{ github.run_number }}
+        path: |
+          kernel-artifacts/bzImage
+          kernel-artifacts/config
+          kernel-artifacts/modules.tar.gz
+        retention-days: 7
