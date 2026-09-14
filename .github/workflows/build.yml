@@ -1,0 +1,90 @@
+name: Build x86_64 Linux Kernel
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: 'Linux Kernel Version (e.g. 6.12.1)'
+        required: true
+        default: '6.12.1'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up environment variables
+      run: |
+        VERSION="${{ github.event.inputs.kernel_version || '6.12.1' }}"
+        MAJOR_VERSION=$(echo "$VERSION" | cut -d. -f1)
+        echo "KERNEL_VERSION=$VERSION" >> $GITHUB_ENV
+        echo "KERNEL_MAJOR=$MAJOR_VERSION" >> $GITHUB_ENV
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          libncurses-dev \
+          bison \
+          flex \
+          libssl-dev \
+          libelf-dev \
+          bc \
+          rsync \
+          kmod \
+          cpio \
+          dwarves \
+          zstd \
+          tar \
+          wget \
+          git
+
+    - name: Download Linux Kernel source
+      run: |
+        echo "Downloading Linux Kernel v${KERNEL_VERSION}..."
+        URL="https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_MAJOR}.x/linux-${KERNEL_VERSION}.tar.xz"
+        wget "$URL" -O linux.tar.xz || {
+          echo "Failed to download $URL, trying alternative..."
+          wget "https://www.kernel.org/pub/linux/kernel/v${KERNEL_MAJOR}.x/linux-${KERNEL_VERSION}.tar.xz" -O linux.tar.xz
+        }
+        tar -xf linux.tar.xz
+        mv linux-${KERNEL_VERSION} linux-source
+
+    - name: Configure Linux Kernel
+      run: |
+        cd linux-source
+        make defconfig
+        # Optimize build speed by disabling heavy debug info
+        scripts/config --disable CONFIG_DEBUG_INFO
+        scripts/config --disable CONFIG_DEBUG_INFO_BTF
+        scripts/config --enable CONFIG_BLK_DEV_INITRD
+        make olddefconfig
+
+    - name: Compile Linux Kernel
+      run: |
+        cd linux-source
+        echo "Starting build with $(nproc) cores..."
+        make -j$(nproc) bzImage
+        make -j$(nproc) modules
+
+    - name: Prepare Artifacts
+      run: |
+        mkdir -p output
+        cp linux-source/arch/x86/boot/bzImage output/bzImage
+        cp linux-source/.config output/kernel.config
+        echo "Kernel build completed successfully."
+        ls -lh output/
+
+    - name: Upload Kernel Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-kernel-x86_64-${{ env.KERNEL_VERSION }}
+        path: output/
