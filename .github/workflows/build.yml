@@ -57,7 +57,7 @@ jobs:
           cd linux-kernel
           make allyesconfig
 
-          scripts/config --enable CONFIG_DEBUG_INFO DEBUG_INFO_DWARF4 DEBUG_INFO_DWARF5 DEBUG_INFO_BTF
+          scripts/config --enable DEBUG_INFO --enable DEBUG_INFO_DWARF4 --enable DEBUG_INFO_DWARF5 --enable DEBUG_INFO_BTF
 
           echo ">>> Config summary:"
           grep -c 'CONFIG_=y' .config || true
@@ -144,7 +144,7 @@ jobs:
           cd linux-kernel
           make ARCH=arm64 allyesconfig
 
-          scripts/config --enable CONFIG_DEBUG_INFO DEBUG_INFO_DWARF4 DEBUG_INFO_DWARF5 DEBUG_INFO_BTF
+          scripts/config --enable DEBUG_INFO --enable DEBUG_INFO_DWARF4 --enable DEBUG_INFO_DWARF5 --enable DEBUG_INFO_BTF
 
           echo ">>> Config summary:"
           grep -c 'CONFIG_=y' .config || true
