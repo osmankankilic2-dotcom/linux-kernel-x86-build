@@ -55,47 +55,9 @@ jobs:
       - name: Configure Kernel (x86_64)
         run: |
           cd linux-kernel
-          make defconfig
+          make allyesconfig
 
-          scripts/config --enable DEBUG_INFO DEBUG_INFO_DWARF4 DEBUG_INFO_DWARF5 DEBUG_INFO_BTF
-
-          # Filesystems
-          scripts/config --enable PROC_FS SYSFS TMPFS TMPFS_POSIX_ACL DEVTMPFS DEVTMPFS_MOUNT
-          scripts/config --enable EXT4_FS EXT4_USE_FOR_EXT2 EXT4_USE_FOR_EXT3
-          scripts/config --enable BTRFS_FS BTRFS_FS_POSIX_ACL XFS_FS XFS_QUOTA F2FS_FS NTFS_FS FAT_FS VFAT_FS ISO9660_FS UDF_FS
-
-          # Network
-          scripts/config --enable NET INET INET6 NETFILTER NETFILTER_XTABLES NETFILTER_NFTABLES
-          scripts/config --enable NET_SCH_FQ_CODEL NET_CLS_BPF NET_ACT_BPF
-          scripts/config --enable TCP_CONGESTION_BBR TCP_CONGESTION_CUBIC WIREGUARD NETFILTER_NETLINK
-
-          # Virtualization
-          scripts/config --enable VIRTIO VIRTIO_PCI VIRTIO_NET VIRTIO_BLK VIRTIO_BALLOON VIRTIO_INPUT VIRTIO_CONSOLE
-          scripts/config --enable KVM KVM_INTEL KVM_AMD VIRTIO_MEM VHOST CONFIG_X86_64_ACPI
-
-          # Storage
-          scripts/config --enable SCSI SCSI_SD_MOD ATA_PIIX PATA_ACPI SATA_AHCI SATA_PMP NVME BLK_DEV_NVME
-
-          # USB
-          scripts/config --enable USB_SUPPORT USB_XHCI_HCD USB_EHCI_HCD USB_OHCI_HCD USB_STORAGE USB_HID
-
-          # Input / Sound
-          scripts/config --enable INPUT_EVDEV INPUT_KEYBOARD INPUT_MOUSE SND SND_USB_AUDIO SND_HDA_INTEL SOUND_CORE SND_PCM SND_TIMER
-
-          # Display
-          scripts/config --enable FB FRAMEBUFFER_CONSOLE FRAMEBUFFER_CONSOLE_DETECT_PRIMARY DRM DRM_KMS_HELPER DRM_I915
-
-          # Wireless / BT
-          scripts/config --enable WIRELESS CFG80211 MAC80211 BT BT_BREDR BT_LE BT_HCIUSB
-
-          # Crypto
-          scripts/config --enable CRYPTO CRYPTO_AES CRYPTO_AES_ARM64_CE CRYPTO_SHA256 CRYPTO_SHA512 CRYPTO_CRC32
-
-          # Power
-          scripts/config --enable PM PM_AUTOSLEEP PM_WAKELOCKS CPU_FREQ CPU_FREQ_GOV_PERFORMANCE CPU_FREQ_GOV_ONDEMAND CPU_FREQ_GOV_SCHEDUTIL ACPI
-
-          # All drivers as modules
-          scripts/config --enable MODULES MODULE_UNLOAD MODULE_FORCE_UNLOAD TRIM_UNUSED_KMODULES
+          scripts/config --enable CONFIG_DEBUG_INFO DEBUG_INFO_DWARF4 DEBUG_INFO_DWARF5 DEBUG_INFO_BTF
 
           echo ">>> Config summary:"
           grep -c 'CONFIG_=y' .config || true
@@ -121,7 +83,7 @@ jobs:
           rm -rf ../modroot-x86_64
           make INSTALL_MOD_PATH=../modroot-x86_64 modules_install
           cd ../modroot-x86_64
-          tar -czf ../kernel-artifacts-x86_64/modules-x86_64.tar.gz .
+          tar -czf ../kernel-artifacts-x86_64/modules.tar.gz .
           cd ..
 
           if [ -d linux-kernel/usr/include ]; then
@@ -180,25 +142,9 @@ jobs:
       - name: Configure Kernel (arm64)
         run: |
           cd linux-kernel
-          make ARCH=arm64 defconfig
+          make ARCH=arm64 allyesconfig
 
-          scripts/config --enable DEBUG_INFO DEBUG_INFO_DWARF4 DEBUG_INFO_DWARF5 DEBUG_INFO_BTF
-          scripts/config --enable PROC_FS SYSFS TMPFS TMPFS_POSIX_ACL DEVTMPFS DEVTMPFS_MOUNT
-          scripts/config --enable EXT4_FS EXT4_USE_FOR_EXT2 EXT4_USE_FOR_EXT3
-          scripts/config --enable BTRFS_FS BTRFS_FS_POSIX_ACL XFS_FS XFS_QUOTA F2FS_FS NTFS_FS FAT_FS VFAT_FS ISO9660_FS UDF_FS
-          scripts/config --enable NET INET INET6 NETFILTER NETFILTER_XTABLES NETFILTER_NFTABLES
-          scripts/config --enable NET_SCH_FQ_CODEL NET_CLS_BPF NET_ACT_BPF
-          scripts/config --enable TCP_CONGESTION_BBR TCP_CONGESTION_CUBIC WIREGUARD NETFILTER_NETLINK
-          scripts/config --enable VIRTIO VIRTIO_PCI VIRTIO_NET VIRTIO_BLK VIRTIO_BALLOON VIRTIO_INPUT VIRTIO_CONSOLE
-          scripts/config --enable KVM KVM_INTEL KVM_AMD VIRTIO_MEM VHOST
-          scripts/config --enable SCSI SCSI_SD_MOD ATA_PIIX PATA_ACPI SATA_AHCI SATA_PMP NVME BLK_DEV_NVME
-          scripts/config --enable USB_SUPPORT USB_XHCI_HCD USB_EHCI_HCD USB_OHCI_HCD USB_STORAGE USB_HID
-          scripts/config --enable INPUT_EVDEV INPUT_KEYBOARD INPUT_MOUSE SND SND_USB_AUDIO SND_HDA_INTEL SOUND_CORE SND_PCM SND_TIMER
-          scripts/config --enable FB FRAMEBUFFER_CONSOLE FRAMEBUFFER_CONSOLE_DETECT_PRIMARY DRM DRM_KMS_HELPER DRM_I915
-          scripts/config --enable WIRELESS CFG80211 MAC80211 BT BT_BREDR BT_LE BT_HCIUSB
-          scripts/config --enable CRYPTO CRYPTO_AES CRYPTO_AES_ARM64_CE CRYPTO_SHA256 CRYPTO_SHA512 CRYPTO_CRC32
-          scripts/config --enable PM PM_AUTOSLEEP PM_WAKELOCKS CPU_FREQ CPU_FREQ_GOV_PERFORMANCE CPU_FREQ_GOV_ONDEMAND CPU_FREQ_GOV_SCHEDUTIL ACPI
-          scripts/config --enable MODULES MODULE_UNLOAD MODULE_FORCE_UNLOAD TRIM_UNUSED_KMODULES
+          scripts/config --enable CONFIG_DEBUG_INFO DEBUG_INFO_DWARF4 DEBUG_INFO_DWARF5 DEBUG_INFO_BTF
 
           echo ">>> Config summary:"
           grep -c 'CONFIG_=y' .config || true
@@ -234,7 +180,7 @@ jobs:
           rm -rf ../modroot-arm64
           ARCH=arm64 make INSTALL_MOD_PATH=../modroot-arm64 modules_install
           cd ../modroot-arm64
-          tar -czf ../kernel-artifacts-arm64/modules-arm64.tar.gz .
+          tar -czf ../kernel-artifacts-arm64/modules.tar.gz .
           cd ..
 
           if [ -d linux-kernel/usr/include ]; then
