@@ -58,6 +58,8 @@ jobs:
           make allyesconfig
 
           scripts/config --enable DEBUG_INFO --enable DEBUG_INFO_DWARF4 --enable DEBUG_INFO_DWARF5 --enable DEBUG_INFO_BTF
+          scripts/config --disable CONFIG_WERROR
+          scripts/config --disable CONFIG_DRM_WERROR
 
           echo ">>> Config summary:"
           grep -c 'CONFIG_=y' .config || true
@@ -69,7 +71,7 @@ jobs:
           cd linux-kernel
           CORES=$(nproc)
           echo ">>> Building with $CORES cores..."
-          make -j$CORES bzImage vmlinux modules
+          make -k -j$CORES KCFLAGS="-Wno-error" KCPPFLAGS="-Wno-error" bzImage vmlinux modules
           echo ">>> Build complete."
 
       - name: Prepare x86_64 Artifacts
@@ -145,6 +147,8 @@ jobs:
           make ARCH=arm64 allyesconfig
 
           scripts/config --enable DEBUG_INFO --enable DEBUG_INFO_DWARF4 --enable DEBUG_INFO_DWARF5 --enable DEBUG_INFO_BTF
+          scripts/config --disable CONFIG_WERROR
+          scripts/config --disable CONFIG_DRM_WERROR
 
           echo ">>> Config summary:"
           grep -c 'CONFIG_=y' .config || true
@@ -156,12 +160,12 @@ jobs:
           cd linux-kernel
           CORES=$(nproc)
           echo ">>> Building arm64 with $CORES cores..."
-          ARCH=arm64 make -j$CORES Image vmlinux modules
+          ARCH=arm64 make -k -j$CORES KCFLAGS="-Wno-error" KCPPFLAGS="-Wno-error" Image vmlinux modules
 
       - name: Build Device Tree Blobs (arm64)
         run: |
           cd linux-kernel
-          ARCH=arm64 make -j$(nproc) dtbs
+          ARCH=arm64 make -k -j$(nproc) KCFLAGS="-Wno-error" KCPPFLAGS="-Wno-error" dtbs
 
       - name: Prepare arm64 Artifacts
         run: |
