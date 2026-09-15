@@ -40,7 +40,7 @@ jobs:
           sudo apt-get install -y \
             build-essential libncurses-dev libncurses5-dev bison flex \
             libssl-dev libelf-dev bc rsync wget pahole git kmod cpio \
-            klibc gcc binutils qemu-system-x86 u-boot-tools device-tree-compiler
+            gcc binutils qemu-system-x86 u-boot-tools device-tree-compiler
 
       - name: Download Linux Kernel Source
         run: |
@@ -126,7 +126,7 @@ jobs:
           sudo apt-get install -y \
             build-essential libncurses-dev libncurses5-dev bison flex \
             libssl-dev libelf-dev bc rsync wget pahole git kmod cpio \
-            klibc gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
             qemu-system-arm u-boot-tools device-tree-compiler
 
       - name: Download Linux Kernel Source
