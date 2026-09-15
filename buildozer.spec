@@ -10,11 +10,16 @@ package.name = aslanvideodownloader
 package.domain = org.aslan
 
 # (str) Source files where the javat/python code is located
+source.dir = .
+
+# (str) Source files to include (let it empty to include all files)
 source.include_exts = py,png,jpg,kv,atlas
 
 # (list) Application requirements
-# comma separated e.g. requirements = sqlite3,kivy
 requirements = python3,kivy,yt-dlp,certifi,urllib3,idna,charset-normalizer,requests
+
+# (str) Version of the application
+version = 1.0.0
 
 # (str) Supported orientations
 orientation = portrait
@@ -39,9 +44,6 @@ fullscreen = 0
 
 # (string) Presets
 android.accept_sdk_license = true
-
-# (list) List of extra java jar files to add
-# android.add_jars = foo.jar,bar.jar
 
 # (list) Architectural builds to support
 android.archs = arm64-v8a,armeabi-v7a
