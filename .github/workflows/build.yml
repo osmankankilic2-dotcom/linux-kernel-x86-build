@@ -160,12 +160,12 @@ jobs:
           cd linux-kernel
           CORES=$(nproc)
           echo ">>> Building arm64 with $CORES cores..."
-          ARCH=arm64 make -k -j$CORES KCFLAGS="-Wno-error" KCPPFLAGS="-Wno-error" Image vmlinux modules
+          ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make -k -j$CORES KCFLAGS="-Wno-error" KCPPFLAGS="-Wno-error" Image vmlinux modules
 
       - name: Build Device Tree Blobs (arm64)
         run: |
           cd linux-kernel
-          ARCH=arm64 make -k -j$(nproc) KCFLAGS="-Wno-error" KCPPFLAGS="-Wno-error" dtbs
+          ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make -k -j$(nproc) KCFLAGS="-Wno-error" KCPPFLAGS="-Wno-error" dtbs
 
       - name: Prepare arm64 Artifacts
         run: |
@@ -182,7 +182,7 @@ jobs:
 
           cd linux-kernel
           rm -rf ../modroot-arm64
-          ARCH=arm64 make INSTALL_MOD_PATH=../modroot-arm64 modules_install
+          ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make INSTALL_MOD_PATH=../modroot-arm64 modules_install
           cd ../modroot-arm64
           tar -czf ../kernel-artifacts-arm64/modules.tar.gz .
           cd ..
