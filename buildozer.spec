@@ -1,0 +1,20 @@
+{
+  "title": "Aslan Video İndirici",
+  "package.name": "aslanvideodownloader",
+  "package.domain": "org.aslan",
+  "source.include_exts": "py,png,jpg,kv,atlas",
+  "source.include_patterns": "assets/*",
+  "version": "1.0.0",
+  "requirements": "python3,kivy,yt-dlp,certifi,urllib3,idna,charset-normalizer,requests",
+  "orientation": "portrait",
+  "osx.python_version": "3",
+  "osx.kivy_version": "2.3.0",
+  "fullscreen": 0,
+  "android.permissions": "INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE",
+  "android.api": "33",
+  "android.minapi": "24",
+  "android.sdk": "33",
+  "android.ndk": "25b",
+  "android.accept_sdk_license": "true",
+  "android.archs": "arm64-v8a,armeabi-v7a"
+}
