@@ -31,7 +31,7 @@ jobs:
 
     - name: Download Linux Kernel Source
       run: |
-        # Latest stable or long-term kernel version (e.g., 6.6 or 6.12)
+        # Use stable Linux kernel version 6.12.9
         KERNEL_VERSION="6.12.9"
         MAJOR_VERSION=$(echo $KERNEL_VERSION | cut -d. -f1)
         
@@ -44,17 +44,124 @@ jobs:
     - name: Configure Kernel
       run: |
         cd linux-kernel
-        # Use default x86_64 configuration (defconfig)
+        # Start with the default x86_64 defconfig
         make defconfig
         
-        # Optional: enable/disable options if needed, e.g. ensuring debugging symbols or specific features
-        # scripts/config --disable SYSTEM_TRUSTED_KEYS
-        # scripts/config --disable SYSTEM_REVOCATION_KEYS
+        # Enable a comprehensive set of features, drivers, and filesystems
+        # Debugging and symbols
+        scripts/config --enable DEBUG_INFO
+        scripts/config --enable DEBUG_INFO_DWARF4
+        scripts/config --enable DEBUG_INFO_DWARF5
+        
+        # Core filesystems and proc/sys
+        scripts/config --enable PROC_FS
+        scripts/config --enable SYSFS
+        scripts/config --enable TMPFS
+        scripts/config --enable TMPFS_POSIX_ACL
+        scripts/config --enable DEVTMPFS
+        scripts/config --enable DEVTMPFS_MOUNT
+        
+        # Common filesystems
+        scripts/config --enable EXT4_FS
+        scripts/config --enable EXT4_USE_FOR_EXT2
+        scripts/config --enable EXT4_USE_FOR_EXT3
+        scripts/config --enable BTRFS_FS
+        scripts/config --enable BTRFS_FS_POSIX_ACL
+        scripts/config --enable XFS_FS
+        scripts/config --enable XFS_QUOTA
+        
+        # Network stack
+        scripts/config --enable NET
+        scripts/config --enable INET
+        scripts/config --enable INET6
+        scripts/config --enable NETFILTER
+        scripts/config --enable NETFILTER_XTABLES
+        scripts/config --enable NET_SCH_FQ_CODEL
+        scripts/config --enable NET_CLS_BPF
+        scripts/config --enable NET_ACT_BPF
+        scripts/config --enable TCP_CONGESTION_BBR
+        
+        # Virtualization and container support
+        scripts/config --enable VIRTIO
+        scripts/config --enable VIRTIO_PCI
+        scripts/config --enable VIRTIO_NET
+        scripts/config --enable VIRTIO_BLK
+        scripts/config --enable VIRTIO_BALLOON
+        scripts/config --enable VIRTIO_INPUT
+        scripts/config --enable VIRTIO_CONSOLE
+        scripts/config --enable KVM
+        scripts/config --enable KVM_INTEL
+        scripts/config --enable KVM_AMD
+        scripts/config --enable CONFIG_X86_64_ACPI
+        
+        # Storage drivers
+        scripts/config --enable SCSI
+        scripts/config --enable SCSI_SD_MOD
+        scripts/config --enable ATA_PIIX
+        scripts/config --enable PATA_ACPI
+        scripts/config --enable SATA_AHCI
+        scripts/config --enable SATA_PMP
+        
+        # USB support
+        scripts/config --enable USB_SUPPORT
+        scripts/config --enable USB_XHCI_HCD
+        scripts/config --enable USB_EHCI_HCD
+        scripts/config --enable USB_STORAGE
+        scripts/config --enable USB_HID
+        
+        # Input and sound
+        scripts/config --enable INPUT_EVDEV
+        scripts/config --enable INPUT_KEYBOARD
+        scripts/config --enable INPUT_MOUSE
+        scripts/config --enable SND
+        scripts/config --enable SND_USB_AUDIO
+        scripts/config --enable SND_HDA_INTEL
+        scripts/config --enable SOUND_CORE
+        
+        # Display and framebuffer
+        scripts/config --enable FB
+        scripts/config --enable FRAMEBUFFER_CONSOLE
+        scripts/config --enable FRAMEBUFFER_CONSOLE_DETECT_PRIMARY
+        scripts/config --enable DRM
+        scripts/config --enable DRM_KMS_HELPER
+        
+        # Wireless and Bluetooth
+        scripts/config --enable WIRELESS
+        scripts/config --enable CFG80211
+        scripts/config --enable MAC80211
+        scripts/config --enable BT
+        scripts/config --enable BT_BREDR
+        scripts/config --enable BT_LE
+        scripts/config --enable BT_HCIUSB
+        
+        # Cryptography
+        scripts/config --enable CRYPTO
+        scripts/config --enable CRYPTO_AES
+        scripts/config --enable CRYPTO_AES_ARM64_CE
+        scripts/config --enable CRYPTO_SHA256
+        scripts/config --enable CRYPTO_SHA512
+        scripts/config --enable CRYPTO_CRC32
+        
+        # Power management
+        scripts/config --enable PM
+        scripts/config --enable PM_AUTOSLEEP
+        scripts/config --enable PM_WAKELOCKS
+        scripts/config --enable CPU_FREQ
+        scripts/config --enable CPU_FREQ_GOV_PERFORMANCE
+        scripts/config --enable CPU_FREQ_GOV_ONDEMAND
+        scripts/config --enable CPU_FREQ_GOV_SCHEDUTIL
+        scripts/config --enable ACPI
+        
+        # Disable problematic or unnecessary options for minimal size but keep it featureful
+        scripts/config --disable SYSTEM_TRUSTED_KEYS
+        scripts/config --disable SYSTEM_REVOCATION_KEYS
+        
+        # Show final config summary
+        grep -E 'CONFIG_(DEBUG_INFO|EXT4|BTRFS|XFS|NETFILTER|KVM|VIRTIO|USB|INPUT|SND|WIRELESS|CRYPTO|PM|FRAMEBUFFER)=' .config | head -n 100
 
     - name: Build Kernel
       run: |
         cd linux-kernel
-        # Get number of CPU cores for parallel compilation
         CORES=$(nproc)
         echo "Building kernel using $CORES cores..."
         make -j$CORES bzImage
@@ -66,7 +173,7 @@ jobs:
         cp linux-kernel/arch/x86/boot/bzImage kernel-artifacts/
         cp linux-kernel/.config kernel-artifacts/config
         
-        # Optionally pack modules if built
+        # Install modules to a temporary root for packaging
         cd linux-kernel
         make INSTALL_MOD_PATH=../modroot modules_install
         cd ../modroot
