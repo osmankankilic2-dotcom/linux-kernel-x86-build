@@ -36,12 +36,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: ${{ fromJson('["' + join(fromJson('[' + github.event.inputs.architectures || '["x86_64","arm64"]') + ']'), '","') + '"]') }}
-      # Static matrix fallback if workflow_dispatch inputs aren't parsed:
-      # Uncomment below for always-running on x86_64 + arm64:
-      # include:
-      #   - arch: x86_64
-      #   - arch: arm64
+        arch: ${{ fromjson(
+          "['"${{ fromJson('architectures') }}"']"
+        ) }}
+        build_type: ${{ fromjson(
+          "['"${{ fromJson('build_type') }}"']"
+        ) }}
 
     steps:
       - name: Checkout Repository
@@ -100,152 +100,143 @@ jobs:
             arm)
               make ARCH=arm defconfig
               ;;
-            *)
-              make defconfig
-              ;;
           esac
 
-          # Enable comprehensive feature set for city-sized build
+          # Comprehensive feature set for city-sized build
           scripts/config --enable DEBUG_INFO
           scripts/config --enable DEBUG_INFO_DWARF4
           scripts/config --enable DEBUG_INFO_DWARF5
           scripts/config --enable DEBUG_INFO_BTF
 
-          # Core filesystems
+          # Filesystems
           scripts/config --enable PROC_FS
           scripts/config --enable SYSFS
-          scripts/config --enable TMPFS
-          scripts/config --enable TMPFS_POSIX_ACL
-          scripts/config --enable DEVTMPFS
-          scripts/config --enable DEVTMPFS_MOUNT
-          scripts/config --enable EXT4_FS
-          scripts/config --enable EXT4_USE_FOR_EXT2
-          scripts/config --enable EXT4_USE_FOR_EXT3
-          scripts/config --enable BTRFS_FS
-          scripts/config --enable BTRFS_FS_POSIX_ACL
-          scripts/config --enable XFS_FS
-          scripts/config --enable XFS_QUOTA
-          scripts/config --enable F2FS_FS
-          scripts/config --enable NTFS_FS
-          scripts/config --enable FAT_FS
-          scripts/config --enable VFAT_FS
-          scripts/config --enable ISO9660_FS
-          scripts/config --enable UDF_FS
+          scripts_config --enable TMPFS
+          scripts_config --enable TMPFS_POSIX_ACL
+          scripts_config --enable DEVTMPFS
+          scripts_config --enable DEVTMPFS_MOUNT
+          scripts_config --enable EXT4_FS
+          scripts_config --enable EXT4_USE_FOR_EXT2
+          scripts_config --enable EXT4_USE_FOR_EXT3
+          scripts_config --enable BTRFS_FS
+          scripts_config --enable BTRFS_FS_POSIX_ACL
+          scripts_config --enable XFS_FS
+          scripts_config --enable XFS_QUOTA
+          scripts_config --enable F2FS_FS
+          scripts_config --enable NTFS_FS
+          scripts_config --enable FAT_FS
+          scripts_config --enable VFAT_FS
+          scripts_config --enable ISO9660_FS
+          scripts_config --enable UDF_FS
 
           # Network stack
-          scripts/config --enable NET
-          scripts/config --enable INET
-          scripts/config --enable INET6
-          scripts/config --enable NETFILTER
-          scripts/config --enable NETFILTER_XTABLES
-          scripts/config --enable NETFILTER_NFTABLES
-          scripts/config --enable NET_SCH_FQ_CODEL
-          scripts/config --enable NET_CLS_BPF
-          scripts/config --enable NET_ACT_BPF
-          scripts/config --enable TCP_CONGESTION_BBR
-          scripts/config --enable TCP_CONGESTION_CUBIC
-          scripts/config --enable WIREGUARD
-          scripts/config --enable NETFILTER_NETLINK
+          scripts_config --enable NET
+          scripts_config --enable INET
+          scripts_config --enable INET6
+          scripts_config --enable NETFILTER
+          scripts_config --enable NETFILTER_XTABLES
+          scripts_config --enable NETFILTER_NFTABLES
+          scripts_config --enable NET_SCH_FQ_CODEL
+          scripts_config --enable NET_CLS_BPF
+          scripts_config --enable NET_ACT_BPF
+          scripts_config --enable TCP_CONGESTION_BBR
+          scripts_config --enable TCP_CONGESTION_CUBIC
+          scripts_config --enable WIREGUARD
+          scripts_config --enable NETFILTER_NETLINK
 
-          # Virtualization and container support
-          scripts/config --enable VIRTIO
-          scripts/config --enable VIRTIO_PCI
-          scripts/config --enable VIRTIO_NET
-          scripts/config --enable VIRTIO_BLK
-          scripts/config --enable VIRTIO_BALLOON
-          scripts/config --enable VIRTIO_INPUT
-          scripts/config --enable VIRTIO_CONSOLE
-          scripts/config --enable KVM
-          scripts/config --enable KVM_INTEL
-          scripts/config --enable KVM_AMD
-          scripts/config --enable VIRTIO_MEM
-          scripts/config --enable VHOST
+          # Virtualization & containers
+          scripts_config --enable VIRTIO
+          scripts_config --enable VIRTIO_PCI
+          scripts_config --enable VIRTIO_NET
+          scripts_config --enable VIRTIO_BLK
+          scripts_config --enable VIRTIO_BALLOON
+          scripts_config --enable VIRTIO_INPUT
+          scripts_config --enable VIRTIO_CONSOLE
+          scripts_config --enable KVM
+          scripts_config --enable KVM_INTEL
+          scripts_config --enable KVM_AMD
+          scripts_config --enable VIRTIO_MEM
+          scripts_config --enable VHOST
 
           if [ "${{ matrix.arch }}" = "x86_64" ]; then
-            scripts/config --enable CONFIG_X86_64_ACPI
+            scripts_config --enable CONFIG_X86_64_ACPI
           fi
 
           # Storage drivers
-          scripts/config --enable SCSI
-          scripts/config --enable SCSI_SD_MOD
-          scripts/config --enable ATA_PIIX
-          scripts/config --enable PATA_ACPI
-          scripts/config --enable SATA_AHCI
-          scripts/config --enable SATA_PMP
-          scripts/config --enable NVME
-          scripts/config --enable BLK_DEV_NVME
+          scripts_config --enable SCSI
+          scripts_config --enable SCSI_SD_MOD
+          scripts_config --enable ATA_PIIX
+          scripts_config --enable PATA_ACPI
+          scripts_config --enable SATA_AHCI
+          scripts_config --enable SATA_PMP
+          scripts_config --enable NVME
+          scripts_config --enable BLK_DEV_NVME
 
           # USB support
-          scripts/config --enable USB_SUPPORT
-          scripts/config --enable USB_XHCI_HCD
-          scripts/config --enable USB_EHCI_HCD
-          scripts/config --enable USB_OHCI_HCD
-          scripts/config --enable USB_STORAGE
-          scripts/config --enable USB_HID
-          scripts/config --enable USB HID
+          scripts_config --enable USB_SUPPORT
+          scripts_config --enable USB_XHCI_HCD
+          scripts_config --enable USB_EHCI_HCD
+          scripts_config --enable USB_OHCI_HCD
+          scripts_config --enable USB_STORAGE
+          scripts_config --enable USB_HID
 
           # Input and sound
-          scripts/config --enable INPUT_EVDEV
-          scripts/config --enable INPUT_KEYBOARD
-          scripts/config --enable INPUT_MOUSE
-          scripts/config --enable SND
-          scripts/config --enable SND_USB_AUDIO
-          scripts/config --enable SND_HDA_INTEL
-          scripts/config --enable SOUND_CORE
-          scripts/config --enable SND_PCM
-          scripts/config --enable SND_TIMER
+          scripts_config --enable INPUT_EVDEV
+          scripts_config --enable INPUT_KEYBOARD
+          scripts_config --enable INPUT_MOUSE
+          scripts_config --enable SND
+          scripts_config --enable SND_USB_AUDIO
+          scripts_config --enable SND_HDA_INTEL
+          scripts_config --enable SOUND_CORE
+          scripts_config --enable SND_PCM
+          scripts_config --enable SND_TIMER
 
           # Display and framebuffer
-          scripts/config --enable FB
-          scripts/config --enable FRAMEBUFFER_CONSOLE
-          scripts/config --enable FRAMEBUFFER_CONSOLE_DETECT_PRIMARY
-          scripts/config --enable DRM
-          scripts/config --enable DRM_KMS_HELPER
-          scripts/config --enable DRM_I915
+          scripts_config --enable FB
+          scripts_config --enable FRAMEBUFFER_CONSOLE
+          scripts_config --enable FRAMEBUFFER_CONSOLE_DETECT_PRIMARY
+          scripts_config --enable DRM
+          scripts_config --enable DRM_KMS_HELPER
+          scripts_config --enable DRM_I915
 
           # Wireless and Bluetooth
-          scripts/config --enable WIRELESS
-          scripts/config --enable CFG80211
-          scripts/config --enable MAC80211
-          scripts/config --enable BT
-          scripts/config --enable BT_BREDR
-          scripts/config --enable BT_LE
-          scripts/config --enable BT_HCIUSB
+          scripts_config --enable WIRELESS
+          scripts_config --enable CFG80211
+          scripts_config --enable MAC80211
+          scripts_config --enable BT
+          scripts_config --enable BT_BREDR
+          scripts_config --enable BT_LE
+          scripts_config --enable BT_HCIUSB
 
           # Cryptography
-          scripts/config --enable CRYPTO
-          scripts/config --enable CRYPTO_AES
-          scripts/config --enable CRYPTO_AES_ARM64_CE
-          scripts/config --enable CRYPTO_SHA256
-          scripts/config --enable CRYPTO_SHA512
-          scripts/config --enable CRYPTO_CRC32
+          scripts_config --enable CRYPTO
+          scripts_config --enable CRYPTO_AES
+          scripts_config --enable CRYPTO_AES_ARM64_CE
+          scripts_config --enable CRYPTO_SHA256
+          scripts_config --enable CRYPTO_SHA512
+          scripts_config --enable CRYPTO_CRC32
 
           # Power management
-          scripts/config --enable PM
-          scripts/config --enable PM_AUTOSLEEP
-          scripts/config --enable PM_WAKELOCKS
-          scripts/config --enable CPU_FREQ
-          scripts/config --enable CPU_FREQ_GOV_PERFORMANCE
-          scripts/config --enable CPU_FREQ_GOV_ONDEMAND
-          scripts/config --enable CPU_FREQ_GOV_SCHEDUTIL
-          scripts/config --enable ACPI
+          scripts_config --enable PM
+          scripts_config --enable PM_AUTOSLEEP
+          scripts_config --enable PM_WAKELOCKS
+          scripts_config --enable CPU_FREQ
+          scripts_config --enable CPU_FREQ_GOV_PERFORMANCE
+          scripts_config --enable CPU_FREQ_GOV_ONDEMAND
+          scripts_config --enable CPU_FREQ_GOV_SCHEDUTIL
+          scripts_config --enable ACPI
 
           # Enable ALL drivers if requested
           if [ "${{ github.event.inputs.enable_all_drivers || 'true' }}" = "true" ]; then
             echo ">>> Enabling ALL drivers and modules..."
-            scripts/config --enable MODULES
-            scripts/config --enable MODULE_UNLOAD
-            scripts/config --enable MODULE_FORCE_UNLOAD
-            # Blindly enable everything that can be module-built
-            for symbol in $(grep -r "is not set" linux-kernel/scripts/kconfig/ 2>/dev/null | head -500); do :; done
-            echo "Enabling tristate for all drivers..."
-            scripts/config --enable TRIM_UNUSED_KMODULES
+            scripts_config --enable MODULES
+            scripts_config --enable MODULE_UNLOAD
+            scripts_config --enable MODULE_FORCE_UNLOAD
+            echo ">>> Final config summary:"
+            grep -c 'CONFIG_=y' .config || true
+            grep -c 'CONFIG_=m' .config || true
+            wc -l .config
           fi
-
-          echo ">>> Final config summary:"
-          grep -c 'CONFIG_=y' .config || true
-          grep -c 'CONFIG_=m' .config || true
-          wc -l .config
 
       - name: Build Kernel Image (${{ matrix.arch }})
         run: |
@@ -258,17 +249,9 @@ jobs:
               make -j$CORES vmlinux
               ;;
             arm64|arm)
-              ARCH="${{ matrix.arch }}" make -j$CORES Image
-              ARCH="${{ matrix.arch }}" make -j$CORES vmlinux
-              ;;
-          esac
-          echo ">>> Building modules..."
-          case "${{ matrix.arch }}" in
-            x86_64)
-              make -j$CORES modules
-              ;;
-            arm64|arm)
-              ARCH="${{ matrix.arch }}" make -j$CORES modules
+              ARCH="${{ matrix.arch }}"
+              make -j$CORES Image
+              make -j$CORES vmlinux
               ;;
           esac
 
@@ -278,10 +261,12 @@ jobs:
           cd linux-kernel
           case "${{ matrix.arch }}" in
             arm64)
-              ARCH=arm64 make -j$(nproc) dtbs
+              ARCH=arm64
+              make -j$(nproc) dtbs
               ;;
             arm)
-              ARCH=arm make -j$(nproc) dtbs
+              ARCH=arm
+              make -j$(nproc) dtbs
               ;;
           esac
 
@@ -293,7 +278,8 @@ jobs:
               make -j$(nproc) headers
               ;;
             arm64|arm)
-              ARCH="${{ matrix.arch }}" make -j$(nproc) headers
+              ARCH="${{ matrix.arch }}"
+              make -j$(nproc) headers
               ;;
           esac
 
@@ -322,11 +308,6 @@ jobs:
           # Copy config
           cp linux-kernel/.config kernel-artifacts-${{ matrix.arch }}/config-${{ matrix.arch }}
 
-          # Copy device trees if available
-          if [ -d linux-kernel/arch/${{ matrix.arch }}/boot/dts ]; then
-            cp -r linux-kernel/arch/${{ matrix.arch }}/boot/dts kernel-artifacts-${{ matrix.arch }}/dts 2>/dev/null || true
-          fi
-
           # Install and package modules
           cd linux-kernel
           rm -rf ../modroot-${{ matrix.arch }}
@@ -350,7 +331,6 @@ jobs:
           path: |
             kernel-artifacts-${{ matrix.arch }}/bzImage
             kernel-artifacts-${{ matrix.arch }}/Image
-            kernel-artifacts-${{ matrix.arch }}/zImage
             kernel-artifacts-${{ matrix.arch }}/vmlinux-*
             kernel-artifacts-${{ matrix.arch }}/config-*
             kernel-artifacts-${{ matrix.arch }}/modules-*.tar.gz
@@ -369,7 +349,7 @@ jobs:
           retention-days: 7
 
   # ──────────────────────────────────────────────
-  # Post-Build: QEMU Quick Boot Test
+  # Post-Build: QEMU Boot Test
   # ──────────────────────────────────────────────
   test-boot:
     name: "QEMU Boot Test [x86_64]"
@@ -397,7 +377,7 @@ jobs:
           echo ">>> QEMU test completed."
 
   # ──────────────────────────────────────────────
-  # Meta Job: Mega Build Summary
+  # Mega Build Summary
   # ──────────────────────────────────────────────
   mega-summary:
     name: "Mega Build Summary"
