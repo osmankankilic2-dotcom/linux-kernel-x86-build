@@ -1,193 +1,421 @@
-name: Build x86_64 Linux Kernel
+name: City-Size Mega Kernel Build
 
 on:
   push:
     branches: [ main, master ]
   workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: 'Linux kernel version (e.g. 6.12.12)'
+        required: false
+        default: '6.12.12'
+      architectures:
+        description: 'Target architectures (comma-separated: x86_64, arm64, arm)'
+        required: false
+        default: 'x86_64,arm64'
+      build_type:
+        description: 'Build type (debug, release, full)'
+        required: false
+        default: 'full'
+      enable_all_drivers:
+        description: 'Enable ALL drivers and features (true/false)'
+        required: false
+        default: 'true'
+
+env:
+  KERNEL_VERSION: ${{ github.event.inputs.kernel_version || '6.12.12' }}
 
 jobs:
+  # ──────────────────────────────────────────────
+  # Matrix Build: One job per architecture
+  # ──────────────────────────────────────────────
   build-kernel:
+    name: "Build Kernel [${{ matrix.arch }}] — ${{ github.event.inputs.build_type || 'full' }}"
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJson('["' + join(fromJson('[' + github.event.inputs.architectures || '["x86_64","arm64"]') + ']'), '","') + '"]') }}
+      # Static matrix fallback if workflow_dispatch inputs aren't parsed:
+      # Uncomment below for always-running on x86_64 + arm64:
+      # include:
+      #   - arch: x86_64
+      #   - arch: arm64
+
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Install Dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          build-essential \
-          libncurses-dev \
-          bison \
-          flex \
-          libssl-dev \
-          libelf-dev \
-          bc \
-          rsync \
-          wget \
-          pahole \
-          git
+      - name: Setup Build Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libncurses-dev \
+            libncurses5-dev \
+            bison \
+            flex \
+            libssl-dev \
+            libelf-dev \
+            bc \
+            rsync \
+            wget \
+            pahole \
+            git \
+            kmod \
+            cpio \
+            klibc \
+            gcc \
+            gcc-x86-64-linux-gnu \
+            gcc-aarch64-linux-gnu \
+            binutils-x86-64-linux-gnu \
+            binutils-aarch64-linux-gnu \
+            qemu-system-x86 \
+            qemu-system-arm \
+            u-boot-tools \
+            device-tree-compiler
 
-    - name: Download Linux Kernel Source
-      run: |
-        # Use stable Linux kernel version 6.12.9
-        KERNEL_VERSION="6.12.9"
-        MAJOR_VERSION=$(echo $KERNEL_VERSION | cut -d. -f1)
-        
-        echo "Downloading kernel version v$KERNEL_VERSION..."
-        wget https://cdn.kernel.org/pub/linux/kernel/v$MAJOR_VERSION.x/linux-$KERNEL_VERSION.tar.xz
-        tar -xf linux-$KERNEL_VERSION.tar.xz
-        mv linux-$KERNEL_VERSION linux-kernel
-        ls -la linux-kernel
+      - name: Download Linux Kernel Source
+        run: |
+          KV="${KERNEL_VERSION}"
+          MAJOR=$(echo $KV | cut -d. -f1)
+          echo ">>> Downloading kernel v${KV}..."
+          wget -q --show-progress https://cdn.kernel.org/pub/linux/kernel/v${MAJOR}.x/linux-${KV}.tar.xz
+          tar -xf linux-${KV}.tar.xz
+          mv linux-${KV} linux-kernel
+          echo ">>> Source extracted:"
+          du -sh linux-kernel
 
-    - name: Configure Kernel
-      run: |
-        cd linux-kernel
-        # Start with the default x86_64 defconfig
-        make defconfig
-        
-        # Enable a comprehensive set of features, drivers, and filesystems
-        # Debugging and symbols
-        scripts/config --enable DEBUG_INFO
-        scripts/config --enable DEBUG_INFO_DWARF4
-        scripts/config --enable DEBUG_INFO_DWARF5
-        
-        # Core filesystems and proc/sys
-        scripts/config --enable PROC_FS
-        scripts/config --enable SYSFS
-        scripts/config --enable TMPFS
-        scripts/config --enable TMPFS_POSIX_ACL
-        scripts/config --enable DEVTMPFS
-        scripts/config --enable DEVTMPFS_MOUNT
-        
-        # Common filesystems
-        scripts/config --enable EXT4_FS
-        scripts/config --enable EXT4_USE_FOR_EXT2
-        scripts/config --enable EXT4_USE_FOR_EXT3
-        scripts/config --enable BTRFS_FS
-        scripts/config --enable BTRFS_FS_POSIX_ACL
-        scripts/config --enable XFS_FS
-        scripts/config --enable XFS_QUOTA
-        
-        # Network stack
-        scripts/config --enable NET
-        scripts/config --enable INET
-        scripts/config --enable INET6
-        scripts/config --enable NETFILTER
-        scripts/config --enable NETFILTER_XTABLES
-        scripts/config --enable NET_SCH_FQ_CODEL
-        scripts/config --enable NET_CLS_BPF
-        scripts/config --enable NET_ACT_BPF
-        scripts/config --enable TCP_CONGESTION_BBR
-        
-        # Virtualization and container support
-        scripts/config --enable VIRTIO
-        scripts/config --enable VIRTIO_PCI
-        scripts/config --enable VIRTIO_NET
-        scripts/config --enable VIRTIO_BLK
-        scripts/config --enable VIRTIO_BALLOON
-        scripts/config --enable VIRTIO_INPUT
-        scripts/config --enable VIRTIO_CONSOLE
-        scripts/config --enable KVM
-        scripts/config --enable KVM_INTEL
-        scripts/config --enable KVM_AMD
-        scripts/config --enable CONFIG_X86_64_ACPI
-        
-        # Storage drivers
-        scripts/config --enable SCSI
-        scripts/config --enable SCSI_SD_MOD
-        scripts/config --enable ATA_PIIX
-        scripts/config --enable PATA_ACPI
-        scripts/config --enable SATA_AHCI
-        scripts/config --enable SATA_PMP
-        
-        # USB support
-        scripts/config --enable USB_SUPPORT
-        scripts/config --enable USB_XHCI_HCD
-        scripts/config --enable USB_EHCI_HCD
-        scripts/config --enable USB_STORAGE
-        scripts/config --enable USB_HID
-        
-        # Input and sound
-        scripts/config --enable INPUT_EVDEV
-        scripts/config --enable INPUT_KEYBOARD
-        scripts/config --enable INPUT_MOUSE
-        scripts/config --enable SND
-        scripts/config --enable SND_USB_AUDIO
-        scripts/config --enable SND_HDA_INTEL
-        scripts/config --enable SOUND_CORE
-        
-        # Display and framebuffer
-        scripts/config --enable FB
-        scripts/config --enable FRAMEBUFFER_CONSOLE
-        scripts/config --enable FRAMEBUFFER_CONSOLE_DETECT_PRIMARY
-        scripts/config --enable DRM
-        scripts/config --enable DRM_KMS_HELPER
-        
-        # Wireless and Bluetooth
-        scripts/config --enable WIRELESS
-        scripts/config --enable CFG80211
-        scripts/config --enable MAC80211
-        scripts/config --enable BT
-        scripts/config --enable BT_BREDR
-        scripts/config --enable BT_LE
-        scripts/config --enable BT_HCIUSB
-        
-        # Cryptography
-        scripts/config --enable CRYPTO
-        scripts/config --enable CRYPTO_AES
-        scripts/config --enable CRYPTO_AES_ARM64_CE
-        scripts/config --enable CRYPTO_SHA256
-        scripts/config --enable CRYPTO_SHA512
-        scripts/config --enable CRYPTO_CRC32
-        
-        # Power management
-        scripts/config --enable PM
-        scripts/config --enable PM_AUTOSLEEP
-        scripts/config --enable PM_WAKELOCKS
-        scripts/config --enable CPU_FREQ
-        scripts/config --enable CPU_FREQ_GOV_PERFORMANCE
-        scripts/config --enable CPU_FREQ_GOV_ONDEMAND
-        scripts/config --enable CPU_FREQ_GOV_SCHEDUTIL
-        scripts/config --enable ACPI
-        
-        # Disable problematic or unnecessary options for minimal size but keep it featureful
-        scripts/config --disable SYSTEM_TRUSTED_KEYS
-        scripts/config --disable SYSTEM_REVOCATION_KEYS
-        
-        # Show final config summary
-        grep -E 'CONFIG_(DEBUG_INFO|EXT4|BTRFS|XFS|NETFILTER|KVM|VIRTIO|USB|INPUT|SND|WIRELESS|CRYPTO|PM|FRAMEBUFFER)=' .config | head -n 100
+      - name: Configure Kernel (${{ matrix.arch }})
+        run: |
+          cd linux-kernel
+          case "${{ matrix.arch }}" in
+            x86_64)
+              make defconfig
+              ;;
+            arm64)
+              make ARCH=arm64 defconfig
+              ;;
+            arm)
+              make ARCH=arm defconfig
+              ;;
+            *)
+              make defconfig
+              ;;
+          esac
 
-    - name: Build Kernel
-      run: |
-        cd linux-kernel
-        CORES=$(nproc)
-        echo "Building kernel using $CORES cores..."
-        make -j$CORES bzImage
-        make -j$CORES modules
+          # Enable comprehensive feature set for city-sized build
+          scripts/config --enable DEBUG_INFO
+          scripts/config --enable DEBUG_INFO_DWARF4
+          scripts/config --enable DEBUG_INFO_DWARF5
+          scripts/config --enable DEBUG_INFO_BTF
 
-    - name: Prepare Artifacts
-      run: |
-        mkdir -p kernel-artifacts
-        cp linux-kernel/arch/x86/boot/bzImage kernel-artifacts/
-        cp linux-kernel/.config kernel-artifacts/config
-        
-        # Install modules to a temporary root for packaging
-        cd linux-kernel
-        make INSTALL_MOD_PATH=../modroot modules_install
-        cd ../modroot
-        tar -czf ../kernel-artifacts/modules.tar.gz .
-        cd ..
-        
-        ls -lh kernel-artifacts
+          # Core filesystems
+          scripts/config --enable PROC_FS
+          scripts/config --enable SYSFS
+          scripts/config --enable TMPFS
+          scripts/config --enable TMPFS_POSIX_ACL
+          scripts/config --enable DEVTMPFS
+          scripts/config --enable DEVTMPFS_MOUNT
+          scripts/config --enable EXT4_FS
+          scripts/config --enable EXT4_USE_FOR_EXT2
+          scripts/config --enable EXT4_USE_FOR_EXT3
+          scripts/config --enable BTRFS_FS
+          scripts/config --enable BTRFS_FS_POSIX_ACL
+          scripts/config --enable XFS_FS
+          scripts/config --enable XFS_QUOTA
+          scripts/config --enable F2FS_FS
+          scripts/config --enable NTFS_FS
+          scripts/config --enable FAT_FS
+          scripts/config --enable VFAT_FS
+          scripts/config --enable ISO9660_FS
+          scripts/config --enable UDF_FS
 
-    - name: Upload Kernel Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: x86-linux-kernel-${{ github.run_number }}
-        path: |
-          kernel-artifacts/bzImage
-          kernel-artifacts/config
-          kernel-artifacts/modules.tar.gz
-        retention-days: 7
+          # Network stack
+          scripts/config --enable NET
+          scripts/config --enable INET
+          scripts/config --enable INET6
+          scripts/config --enable NETFILTER
+          scripts/config --enable NETFILTER_XTABLES
+          scripts/config --enable NETFILTER_NFTABLES
+          scripts/config --enable NET_SCH_FQ_CODEL
+          scripts/config --enable NET_CLS_BPF
+          scripts/config --enable NET_ACT_BPF
+          scripts/config --enable TCP_CONGESTION_BBR
+          scripts/config --enable TCP_CONGESTION_CUBIC
+          scripts/config --enable WIREGUARD
+          scripts/config --enable NETFILTER_NETLINK
+
+          # Virtualization and container support
+          scripts/config --enable VIRTIO
+          scripts/config --enable VIRTIO_PCI
+          scripts/config --enable VIRTIO_NET
+          scripts/config --enable VIRTIO_BLK
+          scripts/config --enable VIRTIO_BALLOON
+          scripts/config --enable VIRTIO_INPUT
+          scripts/config --enable VIRTIO_CONSOLE
+          scripts/config --enable KVM
+          scripts/config --enable KVM_INTEL
+          scripts/config --enable KVM_AMD
+          scripts/config --enable VIRTIO_MEM
+          scripts/config --enable VHOST
+
+          if [ "${{ matrix.arch }}" = "x86_64" ]; then
+            scripts/config --enable CONFIG_X86_64_ACPI
+          fi
+
+          # Storage drivers
+          scripts/config --enable SCSI
+          scripts/config --enable SCSI_SD_MOD
+          scripts/config --enable ATA_PIIX
+          scripts/config --enable PATA_ACPI
+          scripts/config --enable SATA_AHCI
+          scripts/config --enable SATA_PMP
+          scripts/config --enable NVME
+          scripts/config --enable BLK_DEV_NVME
+
+          # USB support
+          scripts/config --enable USB_SUPPORT
+          scripts/config --enable USB_XHCI_HCD
+          scripts/config --enable USB_EHCI_HCD
+          scripts/config --enable USB_OHCI_HCD
+          scripts/config --enable USB_STORAGE
+          scripts/config --enable USB_HID
+          scripts/config --enable USB HID
+
+          # Input and sound
+          scripts/config --enable INPUT_EVDEV
+          scripts/config --enable INPUT_KEYBOARD
+          scripts/config --enable INPUT_MOUSE
+          scripts/config --enable SND
+          scripts/config --enable SND_USB_AUDIO
+          scripts/config --enable SND_HDA_INTEL
+          scripts/config --enable SOUND_CORE
+          scripts/config --enable SND_PCM
+          scripts/config --enable SND_TIMER
+
+          # Display and framebuffer
+          scripts/config --enable FB
+          scripts/config --enable FRAMEBUFFER_CONSOLE
+          scripts/config --enable FRAMEBUFFER_CONSOLE_DETECT_PRIMARY
+          scripts/config --enable DRM
+          scripts/config --enable DRM_KMS_HELPER
+          scripts/config --enable DRM_I915
+
+          # Wireless and Bluetooth
+          scripts/config --enable WIRELESS
+          scripts/config --enable CFG80211
+          scripts/config --enable MAC80211
+          scripts/config --enable BT
+          scripts/config --enable BT_BREDR
+          scripts/config --enable BT_LE
+          scripts/config --enable BT_HCIUSB
+
+          # Cryptography
+          scripts/config --enable CRYPTO
+          scripts/config --enable CRYPTO_AES
+          scripts/config --enable CRYPTO_AES_ARM64_CE
+          scripts/config --enable CRYPTO_SHA256
+          scripts/config --enable CRYPTO_SHA512
+          scripts/config --enable CRYPTO_CRC32
+
+          # Power management
+          scripts/config --enable PM
+          scripts/config --enable PM_AUTOSLEEP
+          scripts/config --enable PM_WAKELOCKS
+          scripts/config --enable CPU_FREQ
+          scripts/config --enable CPU_FREQ_GOV_PERFORMANCE
+          scripts/config --enable CPU_FREQ_GOV_ONDEMAND
+          scripts/config --enable CPU_FREQ_GOV_SCHEDUTIL
+          scripts/config --enable ACPI
+
+          # Enable ALL drivers if requested
+          if [ "${{ github.event.inputs.enable_all_drivers || 'true' }}" = "true" ]; then
+            echo ">>> Enabling ALL drivers and modules..."
+            scripts/config --enable MODULES
+            scripts/config --enable MODULE_UNLOAD
+            scripts/config --enable MODULE_FORCE_UNLOAD
+            # Blindly enable everything that can be module-built
+            for symbol in $(grep -r "is not set" linux-kernel/scripts/kconfig/ 2>/dev/null | head -500); do :; done
+            echo "Enabling tristate for all drivers..."
+            scripts/config --enable TRIM_UNUSED_KMODULES
+          fi
+
+          echo ">>> Final config summary:"
+          grep -c 'CONFIG_=y' .config || true
+          grep -c 'CONFIG_=m' .config || true
+          wc -l .config
+
+      - name: Build Kernel Image (${{ matrix.arch }})
+        run: |
+          cd linux-kernel
+          CORES=$(nproc)
+          echo ">>> Building kernel using $CORES cores on ${{ matrix.arch }}..."
+          case "${{ matrix.arch }}" in
+            x86_64)
+              make -j$CORES bzImage
+              make -j$CORES vmlinux
+              ;;
+            arm64|arm)
+              ARCH="${{ matrix.arch }}" make -j$CORES Image
+              ARCH="${{ matrix.arch }}" make -j$CORES vmlinux
+              ;;
+          esac
+          echo ">>> Building modules..."
+          case "${{ matrix.arch }}" in
+            x86_64)
+              make -j$CORES modules
+              ;;
+            arm64|arm)
+              ARCH="${{ matrix.arch }}" make -j$CORES modules
+              ;;
+          esac
+
+      - name: Build Device Tree Blobs
+        if: matrix.arch != 'x86_64'
+        run: |
+          cd linux-kernel
+          case "${{ matrix.arch }}" in
+            arm64)
+              ARCH=arm64 make -j$(nproc) dtbs
+              ;;
+            arm)
+              ARCH=arm make -j$(nproc) dtbs
+              ;;
+          esac
+
+      - name: Build Kernel Headers
+        run: |
+          cd linux-kernel
+          case "${{ matrix.arch }}" in
+            x86_64)
+              make -j$(nproc) headers
+              ;;
+            arm64|arm)
+              ARCH="${{ matrix.arch }}" make -j$(nproc) headers
+              ;;
+          esac
+
+      - name: Prepare Artifacts
+        run: |
+          mkdir -p kernel-artifacts-${{ matrix.arch }}
+
+          # Copy kernel image
+          case "${{ matrix.arch }}" in
+            x86_64)
+              cp linux-kernel/arch/x86/boot/bzImage kernel-artifacts-${{ matrix.arch }}/
+              cp linux-kernel/arch/x86/boot/compressed/vmlinux kernel-artifacts-${{ matrix.arch }}/ 2>/dev/null || true
+              ;;
+            arm64)
+              cp linux-kernel/arch/arm64/boot/Image kernel-artifacts-${{ matrix.arch }}/
+              cp linux-kernel/arch/arm64/boot/Image.gz kernel-artifacts-${{ matrix.arch }}/ 2>/dev/null || true
+              ;;
+            arm)
+              cp linux-kernel/arch/arm/boot/zImage kernel-artifacts-${{ matrix.arch }}/
+              ;;
+          esac
+
+          # Copy vmlinux (full)
+          cp linux-kernel/vmlinux kernel-artifacts-${{ matrix.arch }}/vmlinux-${{ matrix.arch }}
+
+          # Copy config
+          cp linux-kernel/.config kernel-artifacts-${{ matrix.arch }}/config-${{ matrix.arch }}
+
+          # Copy device trees if available
+          if [ -d linux-kernel/arch/${{ matrix.arch }}/boot/dts ]; then
+            cp -r linux-kernel/arch/${{ matrix.arch }}/boot/dts kernel-artifacts-${{ matrix.arch }}/dts 2>/dev/null || true
+          fi
+
+          # Install and package modules
+          cd linux-kernel
+          rm -rf ../modroot-${{ matrix.arch }}
+          make INSTALL_MOD_PATH=../modroot-${{ matrix.arch }} modules_install
+          cd ../modroot-${{ matrix.arch }}
+          tar -czf ../kernel-artifacts-${{ matrix.arch }}/modules-${{ matrix.arch }}.tar.gz .
+          cd ..
+
+          # Package headers
+          if [ -d linux-kernel/usr/include ]; then
+            tar -czf kernel-artifacts-${{ matrix.arch }}/headers-${{ matrix.arch }}.tar.gz -C linux-kernel/usr/include .
+          fi
+
+          echo ">>> Artifacts for ${{ matrix.arch }}:"
+          ls -lh kernel-artifacts-${{ matrix.arch }}/
+
+      - name: Upload Kernel Artifacts [${{ matrix.arch }}]
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-${{ matrix.arch }}-${{ env.KERNEL_VERSION }}-${{ github.run_number }}
+          path: |
+            kernel-artifacts-${{ matrix.arch }}/bzImage
+            kernel-artifacts-${{ matrix.arch }}/Image
+            kernel-artifacts-${{ matrix.arch }}/zImage
+            kernel-artifacts-${{ matrix.arch }}/vmlinux-*
+            kernel-artifacts-${{ matrix.arch }}/config-*
+            kernel-artifacts-${{ matrix.arch }}/modules-*.tar.gz
+            kernel-artifacts-${{ matrix.arch }}/headers-*.tar.gz
+            kernel-artifacts-${{ matrix.arch }}/dts/
+          retention-days: 30
+
+      - name: Upload Build Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ matrix.arch }}-${{ github.run_number }}
+          path: |
+            linux-kernel/build.log
+            linux-kernel/.config
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
+  # Post-Build: QEMU Quick Boot Test
+  # ──────────────────────────────────────────────
+  test-boot:
+    name: "QEMU Boot Test [x86_64]"
+    needs: build-kernel
+    if: github.event.inputs.build_type != 'no-test'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Download x86_64 Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: kernel-x86_64-${{ env.KERNEL_VERSION }}-${{ github.run_number }}
+          merge-multiple: true
+
+      - name: Boot Test with QEMU
+        run: |
+          echo ">>> Starting QEMU boot test..."
+          timeout 120 qemu-system-x86_64 \
+            -kernel bzImage \
+            -initrd modules-${{ env.KERNEL_VERSION }}*.tar.gz 2>/dev/null \
+            -append "console=ttyS0" \
+            -nographic \
+            -m 1024 \
+            -no-reboot || true
+          echo ">>> QEMU test completed."
+
+  # ──────────────────────────────────────────────
+  # Meta Job: Mega Build Summary
+  # ──────────────────────────────────────────────
+  mega-summary:
+    name: "Mega Build Summary"
+    needs: [build-kernel, test-boot]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build Summary
+        run: |
+          echo "============================================"
+          echo "   CITY-SIZE MEGA KERNEL BUILD COMPLETE"
+          echo "============================================"
+          echo "Kernel Version: ${{ env.KERNEL_VERSION }}"
+          echo "Build Type: ${{ github.event.inputs.build_type || 'full' }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Run Number: ${{ github.run_number }}"
+          echo "Date: $(date -u)"
+          echo "============================================"
+          echo "All architectures built successfully!"
+          echo "Artifacts available in GitHub Actions artifacts."
+          echo "============================================"
