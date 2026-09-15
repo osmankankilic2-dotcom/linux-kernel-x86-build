@@ -77,6 +77,12 @@ jobs:
       - name: Prepare x86_64 Artifacts
         run: |
           mkdir -p kernel-artifacts-x86_64
+          
+          # Compress bzImage and related core files with high compression tar.xz
+          tar -cJf kernel-artifacts-x86_64/kernel-core-x86_64.tar.xz \
+            -C linux-kernel/arch/x86/boot bzImage \
+            -C ../linux-kernel .config
+
           cp linux-kernel/arch/x86/boot/bzImage kernel-artifacts-x86_64/
           cp linux-kernel/vmlinux kernel-artifacts-x86_64/vmlinux-x86_64
           cp linux-kernel/.config kernel-artifacts-x86_64/config-x86_64
@@ -85,14 +91,14 @@ jobs:
           rm -rf ../modroot-x86_64
           make INSTALL_MOD_PATH=../modroot-x86_64 modules_install
           cd ../modroot-x86_64
-          tar -czf ../kernel-artifacts-x86_64/modules.tar.gz .
+          tar -cJf ../kernel-artifacts-x86_64/modules.tar.xz .
           cd ..
 
           if [ -d linux-kernel/usr/include ]; then
-            tar -czf kernel-artifacts-x86_64/headers-x86_64.tar.gz -C linux-kernel/usr/include .
+            tar -cJf kernel-artifacts-x86_64/headers-x86_64.tar.xz -C linux-kernel/usr/include .
           fi
 
-          echo ">>> x86_64 artifacts:"
+          echo ">>> High-compression x86_64 artifacts:"
           ls -lh kernel-artifacts-x86_64/
 
       - name: Upload x86_64 Artifacts
