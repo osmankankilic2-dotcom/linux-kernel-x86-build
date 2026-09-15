@@ -23,7 +23,7 @@ env:
 
 jobs:
   # ──────────────────────────────────────────────
-  # City-Size Mega Build: x86_64 + arm64 parallel
+  # City-Size Mega Build: x86_64 Only
   # ──────────────────────────────────────────────
   build-x86_64:
     name: "Build Kernel [x86_64] — ${{ github.event.inputs.build_type || 'full' }}"
@@ -111,110 +111,11 @@ jobs:
           retention-days: 7
 
   # ──────────────────────────────────────────────
-  # arm64 Build
-  # ──────────────────────────────────────────────
-  build-arm64:
-    name: "Build Kernel [arm64] — ${{ github.event.inputs.build_type || 'full' }}"
-    runs-on: ubuntu-latest
-    timeout-minutes: 180
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Build Environment
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential libncurses-dev libncurses5-dev bison flex \
-            libssl-dev libelf-dev bc rsync wget pahole git kmod cpio \
-            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
-            qemu-system-arm u-boot-tools device-tree-compiler
-
-      - name: Download Linux Kernel Source
-        run: |
-          KV="${KERNEL_VERSION}"
-          MAJOR=$(echo $KV | cut -d. -f1)
-          echo ">>> Downloading kernel v${KV}..."
-          wget -q --show-progress https://cdn.kernel.org/pub/linux/kernel/v${MAJOR}.x/linux-${KV}.tar.xz
-          tar -xf linux-${KV}.tar.xz
-          mv linux-${KV} linux-kernel
-          echo ">>> Source size: $(du -sh linux-kernel)"
-
-      - name: Configure Kernel (arm64)
-        run: |
-          cd linux-kernel
-          make ARCH=arm64 allyesconfig
-
-          scripts/config --enable DEBUG_INFO --enable DEBUG_INFO_DWARF4 --enable DEBUG_INFO_DWARF5 --enable DEBUG_INFO_BTF
-          scripts/config --disable CONFIG_WERROR
-          scripts/config --disable CONFIG_DRM_WERROR
-
-          echo ">>> Config summary:"
-          grep -c 'CONFIG_=y' .config || true
-          grep -c 'CONFIG_=m' .config || true
-          wc -l .config
-
-      - name: Build Kernel (arm64)
-        run: |
-          cd linux-kernel
-          CORES=$(nproc)
-          echo ">>> Building arm64 with $CORES cores..."
-          ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make -k -j$CORES KCFLAGS="-Wno-error" KCPPFLAGS="-Wno-error" Image vmlinux modules
-
-      - name: Build Device Tree Blobs (arm64)
-        run: |
-          cd linux-kernel
-          ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make -k -j$(nproc) KCFLAGS="-Wno-error" KCPPFLAGS="-Wno-error" dtbs
-
-      - name: Prepare arm64 Artifacts
-        run: |
-          mkdir -p kernel-artifacts-arm64
-          cp linux-kernel/arch/arm64/boot/Image kernel-artifacts-arm64/
-          cp linux-kernel/arch/arm64/boot/Image.gz kernel-artifacts-arm64/ 2>/dev/null || true
-          cp linux-kernel/vmlinux kernel-artifacts-arm64/vmlinux-arm64
-          cp linux-kernel/.config kernel-artifacts-arm64/config-arm64
-
-          # DTBs
-          if [ -d linux-kernel/arch/arm64/boot/dts ]; then
-            cp -r linux-kernel/arch/arm64/boot/dts kernel-artifacts-arm64/dts 2>/dev/null || true
-          fi
-
-          cd linux-kernel
-          rm -rf ../modroot-arm64
-          ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make INSTALL_MOD_PATH=../modroot-arm64 modules_install
-          cd ../modroot-arm64
-          tar -czf ../kernel-artifacts-arm64/modules.tar.gz .
-          cd ..
-
-          if [ -d linux-kernel/usr/include ]; then
-            tar -czf kernel-artifacts-arm64/headers-arm64.tar.gz -C linux-kernel/usr/include .
-          fi
-
-          echo ">>> arm64 artifacts:"
-          ls -lh kernel-artifacts-arm64/
-
-      - name: Upload arm64 Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel-arm64-${{ env.KERNEL_VERSION }}-${{ github.run_number }}
-          path: kernel-artifacts-arm64/*
-          retention-days: 30
-
-      - name: Upload Build Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs-arm64-${{ github.run_number }}
-          path: linux-kernel/.config
-          retention-days: 7
-
-  # ──────────────────────────────────────────────
   # QEMU Boot Test
   # ──────────────────────────────────────────────
   test-boot:
     name: "QEMU Boot Test [x86_64]"
-    needs: [build-x86_64, build-arm64]
+    needs: [build-x86_64]
     if: github.event.inputs.build_type != 'no-test'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -243,7 +144,7 @@ jobs:
   # ──────────────────────────────────────────────
   mega-summary:
     name: "Mega Build Summary"
-    needs: [build-x86_64, build-arm64, test-boot]
+    needs: [build-x86_64, test-boot]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -258,6 +159,6 @@ jobs:
           echo "Run Number: ${{ github.run_number }}"
           echo "Date: $(date -u)"
           echo "============================================"
-          echo "Architectures built: x86_64, arm64"
+          echo "Architectures built: x86_64"
           echo "Artifacts available in GitHub Actions artifacts."
           echo "============================================"
